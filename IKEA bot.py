@@ -6,6 +6,11 @@ from vk_api.utils import get_random_id
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 
+class Mykeyboard:
+    def __init__(self):
+        pass
+
+
 def uploadphoto(photto):
     upload = vk_api.VkUpload(vk)
     photo = upload.photo_messages(photto)
@@ -75,14 +80,15 @@ class MyVkLongPoll(VkLongPoll):
 con = sqlite3.connect("IKEAbd.sqlite")
 cur = con.cursor()
 keyboard = VkKeyboard(one_time=True)
-klavamenu()
 token = "22013ca45499fa5b21f7c510114f67adbb99595967b9a74edf9843ce6a8f1701f966b7397442512f5f4f8"
 vk = vk_api.VkApi(token=token)
 upload = VkUpload(vk)
+chat_id_sotrudnik = None
 
 
 def main():
     global keyboard
+    klavamenu()
     longpoll = VkLongPoll(vk)
     zakaz = []
     zdacha = []
@@ -114,18 +120,19 @@ def main():
                                 cur.execute(f"""SELECT tovar FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[0][0]
                             kolvo = int(vvod[1])
                             price = \
-                                cur.execute(f"""SELECT price FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[0][
-                                    0] * kolvo
+                                round(cur.execute(f"""SELECT price FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[
+                                          0][
+                                          0] * kolvo, 2)
                             koordi = (int(vvod[2]), int(vvod[3]))
-                            dostavka = ((koordi[0] - koordiIKEA[0]) ** 2 + (
-                                    koordi[1] - koordiIKEA[1]) ** 2) ** 0.5 // 1000 * pricedostavki
+                            dostavka = round(((koordi[0] - koordiIKEA[0]) ** 2 + (
+                                    koordi[1] - koordiIKEA[1]) ** 2) ** 0.5 // 1000 * pricedostavki, 2)
                             fullprice = price + dostavka
                             podzakaz.update([(event.user_id, [tovar, kolvo, fullprice, f'x{koordi[0]}y{koordi[1]}'])])
                             if not koordi[0] > 30000 and not koordi[1] > 30000 and not koordi[0] < -30000 and not \
                                     koordi[1] < -30000:
                                 if kolvo > 0:
                                     write_msg(event.user_id,
-                                              f'Стоимость товара в заказе: {price}\nСтоимость доставки: {dostavka}\nИтоговая цена: {fullprice}\n\nОтправте подтверждение оплаты(скрин перевода денег)')
+                                              f'Стоимость товара в заказе: {price}\nСтоимость доставки: {dostavka}\nИтоговая цена: {fullprice}\n\nОтправте подтверждение оплаты(скрин перевода монет)')
                                     proverka.append(event.user_id)
                                     keyboard = VkKeyboard(one_time=True)
                                     keyboard.add_button('Вернуться в основное меню', color=VkKeyboardColor.POSITIVE)
@@ -156,9 +163,10 @@ def main():
                                 cur.execute(f"""UPDATE Zakazi SET oplata = 1 WHERE id = {int(request)}""")
                                 z = cur.execute(f"""SELECT * FROM Zakazi WHERE id = {int(request)}""").fetchall()[0]
                                 con.commit()
-                                vk.method('messages.send', {'chat_id': 2,
-                                                            'message': f'Новый заказ!\n{z[1]}\n{z[2]} штук\nКоординаты: {z[4]}\nЗаказ от @id{z[5]}({fullname(z[5])})',
-                                                            'random_id': get_random_id()})
+                                if chat_id_sotrudnik:
+                                    vk.method('messages.send', {'chat_id': chat_id_sotrudnik,
+                                                                'message': f'Новый заказ!\n{z[1]}\n{z[2]} штук\nКоординаты: {z[4]}\nЗаказ от @id{z[5]}({fullname(z[5])})',
+                                                                'random_id': get_random_id()})
 
                                 idvk = \
                                     cur.execute(f"""SELECT idvk FROM Zakazi WHERE id = {int(request)}""").fetchall()[0][
@@ -177,10 +185,11 @@ def main():
                                 klavarabotnik()
                                 pod.remove(event.user_id)
                                 write_msg(event.user_id, 'Такого заказа нет!')
-                    except Exception:
+                    except Exception as er:
                         pod.remove(event.user_id)
                         klavarabotnik()
                         write_msg(event.user_id, 'Неверный формат ввода!')
+                        print(er)
 
                 elif event.user_id in proverka:
                     if request == 'Вернуться в основное меню':
@@ -189,7 +198,7 @@ def main():
                         write_msg(event.user_id, 'Главное меню')
                     else:
                         try:
-                            if kartinka and kartinka['attach1_type'] == 'photo':
+                            if 1:
                                 print(podzakaz)
 
                                 cur.execute(
@@ -197,12 +206,13 @@ def main():
                                     (podzakaz[event.user_id][0], podzakaz[event.user_id][1], podzakaz[event.user_id][2],
                                      podzakaz[event.user_id][3], event.user_id))
                                 con.commit()
-                                vk.method('messages.send', {'chat_id': 2,
-                                                            'message': f'Проверте оплату покупателя:\n@id{event.user_id}({fullname(event.user_id)})',
-                                                            'random_id': get_random_id()})
                                 klavamenu()
                                 write_msg(event.user_id,
                                           'Ваша заявка принята!\nОжидание проверки оплаты администрацией...')
+                                if chat_id_sotrudnik:
+                                    vk.method('messages.send', {'chat_id': chat_id_sotrudnik,
+                                                                'message': f'Новые не подтвержденные заказы!',
+                                                                'random_id': get_random_id()})
                                 proverka.remove(event.user_id)
                             else:
                                 klavamenu()
@@ -220,9 +230,10 @@ def main():
                             cur.execute(f"""DELETE FROM Zakazi WHERE id = {int(request)}""")
                             con.commit()
                             write_msg(event.user_id, f'Заказ №{request} выполнен!')
-                            vk.method('messages.send', {'chat_id': 2,
-                                                        'message': f'Заказ №{request} выполнен сотрудником: {fullname(event.user_id)}!',
-                                                        'random_id': get_random_id()})
+                            if chat_id_sotrudnik:
+                                vk.method('messages.send', {'chat_id': chat_id_sotrudnik,
+                                                            'message': f'Заказ №{request} выполнен сотрудником: {fullname(event.user_id)}!',
+                                                            'random_id': get_random_id()})
 
                             zdacha.remove(event.user_id)
                         else:
@@ -282,7 +293,7 @@ def main():
                             keyboard = VkKeyboard(one_time=True)
                             keyboard.add_button('Вернуться в основное меню', color=VkKeyboardColor.POSITIVE)
                             write_msg(event.user_id, result)
-                            write_msg(event.user_id, 'Оплата какого товара вы хотите подтвердить?')
+                            write_msg(event.user_id, 'Оплату какого товара вы хотите подтвердить?')
                             pod.append(event.user_id)
                         else:
                             klavarabotnik()
