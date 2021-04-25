@@ -6,13 +6,9 @@ from vk_api.utils import get_random_id
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 
-class Mykeyboard:
-    def __init__(self):
-        pass
-
-
+# функция для загрузки фото в сообщение
 def uploadphoto(photto):
-    upload = vk_api.VkUpload(vk)
+    upload = VkUpload(vk)
     photo = upload.photo_messages(photto)
     owner_id = photo[0]['owner_id']
     photo_id = photo[0]['id']
@@ -21,17 +17,20 @@ def uploadphoto(photto):
     return attachment
 
 
+# функция для написания сообщения
 def write_msg(user_id, message):
     vk.method('messages.send', {'user_id': user_id, 'message': message, 'random_id': get_random_id(),
                                 'keyboard': keyboard.get_keyboard()})
 
 
+# функция для преобразования id вк в имя пользователя
 def fullname(user_id):
     user = vk.method("users.get", {"user_ids": user_id})  # вместо 1 подставляете айди нужного юзера
     fullname = user[0]['first_name'] + ' ' + user[0]['last_name']
     return fullname
 
 
+# функция для коавиатуры работника
 def klavarabotnik():
     global keyboard
     keyboard = VkKeyboard(one_time=True)
@@ -49,6 +48,7 @@ def klavarabotnik():
     keyboard.add_button('Вернуться в основное меню', color=VkKeyboardColor.NEGATIVE)
 
 
+# клавиатура основного меню
 def klavamenu():
     global keyboard
     keyboard = VkKeyboard(one_time=True)
@@ -58,8 +58,11 @@ def klavamenu():
     keyboard.add_button('Сделать заказ', color=VkKeyboardColor.PRIMARY)
     keyboard.add_line()
     keyboard.add_button('Функции для работников магазина', color=VkKeyboardColor.SECONDARY)
+    keyboard.add_line()
+    keyboard.add_button('Перейти к переписке с админом', color=VkKeyboardColor.SECONDARY)
 
 
+# склад
 def printsklad(event):
     result = ''
     for i in cur.execute("""SELECT * FROM tovari""").fetchall():
@@ -67,6 +70,7 @@ def printsklad(event):
     write_msg(event.user_id, result)
 
 
+# унаследованный класс для обхода ограничения вконтакте по времени чтения лонгпула
 class MyVkLongPoll(VkLongPoll):
     def listen(self):
         while True:
@@ -77,29 +81,37 @@ class MyVkLongPoll(VkLongPoll):
                 print('error', e)
 
 
+# база дынных
 con = sqlite3.connect("IKEAbd.sqlite")
 cur = con.cursor()
-keyboard = VkKeyboard(one_time=True)
-token = "22013ca45499fa5b21f7c510114f67adbb99595967b9a74edf9843ce6a8f1701f966b7397442512f5f4f8"
+# api
+with open('token.txt', 'r') as file:
+    token = file.readline()
 vk = vk_api.VkApi(token=token)
-upload = VkUpload(vk)
+# если есть чат сотрудников, сюда ввести id
 chat_id_sotrudnik = None
+# создание клавиатуры
+keyboard = VkKeyboard(one_time=True)
+version = 1.3
+longpoll = MyVkLongPoll(vk)
+# координаты магазина
+koordiIKEA = (3050, 3350)
+# цена доставки за 1км
+pricedostavki = 5
 
 
+# основная функция
 def main():
     global keyboard
     klavamenu()
-    longpoll = VkLongPoll(vk)
+    # списки, в которые заносится id пользователей для отслеживания на каком меню они находятся
     zakaz = []
     zdacha = []
     popolnenie = []
     proverka = []
     pod = []
-    koordiIKEA = (3050, 3350)
-    pricedostavki = 5
-    version = 1.3
+    admin = []
     podzakaz = {}
-    keyboard = VkKeyboard(one_time=True)
     # Основной цикл
     for event in longpoll.listen():
         # Если пришло новое сообщение
@@ -108,6 +120,7 @@ def main():
             if event.to_me:
                 # Сообщение от пользователя
                 request = event.text
+                # если пользователь заказывает
                 if event.user_id in zakaz:
                     if request == 'Вернуться в основное меню':
                         zakaz.remove(event.user_id)
@@ -150,7 +163,7 @@ def main():
                             zakaz.remove(event.user_id)
                             klavamenu()
                             write_msg(event.user_id, 'Неверный формат ввода')
-
+                # если сотрудник магазина подтверждает оплату
                 elif event.user_id in pod:
                     try:
                         if request == 'Вернуться в основное меню':
@@ -190,7 +203,7 @@ def main():
                         klavarabotnik()
                         write_msg(event.user_id, 'Неверный формат ввода!')
                         print(er)
-
+                # пользователь отправляет на проверку оплату
                 elif event.user_id in proverka:
                     if request == 'Вернуться в основное меню':
                         proverka.remove(event.user_id)
@@ -198,13 +211,13 @@ def main():
                         write_msg(event.user_id, 'Главное меню')
                     else:
                         try:
-                            if 1:
-                                print(podzakaz)
-
+                            if event.attachments['attach1_type'] and event.attachments['attach1_type'] == 'photo':
+                                url = vk.method('messages.getById', {'message_ids': event.message_id})['items'][0][
+                                    'attachments'][0]['photo']['sizes'][-1]['url']
                                 cur.execute(
-                                    """INSERT INTO Zakazi(Tovar, Kolvo, Price, koordi, idvk) VALUES (?, ?, ?, ?, ?)""",
+                                    """INSERT INTO Zakazi(Tovar, Kolvo, Price, koordi, idvk, urloplati) VALUES (?, ?, ?, ?, ?, ?)""",
                                     (podzakaz[event.user_id][0], podzakaz[event.user_id][1], podzakaz[event.user_id][2],
-                                     podzakaz[event.user_id][3], event.user_id))
+                                     podzakaz[event.user_id][3], event.user_id, url))
                                 con.commit()
                                 klavamenu()
                                 write_msg(event.user_id,
@@ -218,11 +231,12 @@ def main():
                                 klavamenu()
                                 write_msg(event.user_id, 'Неправильный формат')
                                 proverka.remove(event.user_id)
-                        except Exception:
+                        except Exception as er:
                             klavamenu()
                             write_msg(event.user_id, 'Неправильный формат')
                             proverka.remove(event.user_id)
-
+                            print(er)
+                # сдача заказа сотрудником
                 elif event.user_id in zdacha:
                     try:
                         if (int(request),) in cur.execute("""SELECT id FROM Zakazi"""):
@@ -244,7 +258,7 @@ def main():
                         klavarabotnik()
                         write_msg(event.user_id, 'Неверный формат ввода')
                         zdacha.remove(event.user_id)
-
+                # сотрудник пополняет склад
                 elif event.user_id in popolnenie:
                     if request == 'Вернуться в основное меню':
                         popolnenie.remove(event.user_id)
@@ -269,13 +283,19 @@ def main():
                             klavarabotnik()
                             write_msg(event.user_id, 'Неверный формат ввода')
 
+                elif event.user_id in admin:
+                    if request == 'Перейти к переписке с ботом':
+                        klavamenu()
+                        write_msg(event.user_id, 'Основное меню')
+                        admin.remove(event.user_id)
+
                 elif request == 'Не подтвержденные заказы':
                     if (event.user_id,) in cur.execute("""SELECT idvk FROM Workers""").fetchall():
                         klavarabotnik()
                         result = ''
                         if cur.execute("""SELECT * FROM Zakazi WHERE oplata = 0""").fetchall():
                             for i in cur.execute("""SELECT * FROM Zakazi WHERE oplata = 0""").fetchall():
-                                result += f'Заказ №{i[0]} Товар: {i[1]} Количество: {i[2]} Цена: {i[3]} Координаты: {i[4]} Вк: @id{i[5]}({fullname(i[5])})\n'
+                                result += f'Заказ №{i[0]} Товар: {i[1]} Количество: {i[2]} Цена: {i[3]} Координаты: {i[4]} Вк: @id{i[5]}({fullname(i[5])})\nОплата:\n{i[7]}'
                             write_msg(event.user_id, result)
                         else:
                             write_msg(event.user_id, 'Заказов нет!')
@@ -288,8 +308,7 @@ def main():
                         if cur.execute("""SELECT * FROM Zakazi WHERE oplata = 0""").fetchall():
                             result = ''
                             for i in cur.execute("""SELECT * FROM Zakazi WHERE oplata = 0""").fetchall():
-                                result += f'Заказ №{i[0]} Товар: {i[1]} Количество: {i[2]} Цена: {i[3]} Координаты: {i[4]} Вк: @id{i[5]}({fullname(i[5])})\n'
-
+                                result += f'Заказ №{i[0]} Товар: {i[1]} Количество: {i[2]} Цена: {i[3]} Координаты: {i[4]} Вк: @id{i[5]}({fullname(i[5])})\nОплата:\n{i[7]}'
                             keyboard = VkKeyboard(one_time=True)
                             keyboard.add_button('Вернуться в основное меню', color=VkKeyboardColor.POSITIVE)
                             write_msg(event.user_id, result)
@@ -375,6 +394,13 @@ def main():
                     else:
                         klavamenu()
                         write_msg(event.user_id, "Нет доступа")
+
+                elif request == 'Перейти к переписке с админом':
+                    admin.append(event.user_id)
+                    keyboard = VkKeyboard(one_time=True)
+                    keyboard.add_button('Перейти к переписке с ботом', color=VkKeyboardColor.POSITIVE)
+                    write_msg(event.user_id, 'Связываюсь с админом....\nМожете набирать сообщение')
+
                 else:
                     klavamenu()
                     write_msg(event.user_id, "Несуществующая команда")
