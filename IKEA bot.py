@@ -127,38 +127,46 @@ def main():
                         klavamenu()
                         write_msg(event.user_id, 'Главное меню')
                     else:
+                        vvod = request.split()
                         try:
-                            vvod = request.split()
-                            tovar = \
-                                cur.execute(f"""SELECT tovar FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[0][0]
-                            kolvo = int(vvod[1])
-                            price = \
-                                round(cur.execute(f"""SELECT price FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[
-                                          0][
-                                          0] * kolvo, 2)
-                            koordi = (int(vvod[2]), int(vvod[3]))
-                            dostavka = round(((koordi[0] - koordiIKEA[0]) ** 2 + (
-                                    koordi[1] - koordiIKEA[1]) ** 2) ** 0.5 // 1000 * pricedostavki, 2)
-                            fullprice = price + dostavka
-                            podzakaz.update([(event.user_id, [tovar, kolvo, fullprice, f'x{koordi[0]}y{koordi[1]}'])])
-                            if not koordi[0] > 30000 and not koordi[1] > 30000 and not koordi[0] < -30000 and not \
-                                    koordi[1] < -30000:
-                                if kolvo > 0:
-                                    write_msg(event.user_id,
-                                              f'Стоимость товара в заказе: {price}\nСтоимость доставки: {dostavka}\nИтоговая цена: {fullprice}\n\nОтправте подтверждение оплаты(скрин перевода монет)')
-                                    proverka.append(event.user_id)
-                                    keyboard = VkKeyboard(one_time=True)
-                                    keyboard.add_button('Вернуться в основное меню', color=VkKeyboardColor.POSITIVE)
-                                    write_msg(event.user_id, 'Проверка оплаты...')
+                            if int(vvod[0]) in cur.execute(f"""SELECT id FROM tovari""").fetchall()[0]:
+                                tovar = \
+                                    cur.execute(f"""SELECT tovar FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[
+                                        0][0]
+
+                                kolvo = int(vvod[1])
+                                price = \
+                                    round(cur.execute(
+                                        f"""SELECT price FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[
+                                              0][
+                                              0] * kolvo, 2)
+                                koordi = (int(vvod[2]), int(vvod[3]))
+                                dostavka = round(((koordi[0] - koordiIKEA[0]) ** 2 + (
+                                        koordi[1] - koordiIKEA[1]) ** 2) ** 0.5 // 1000 * pricedostavki, 2)
+                                fullprice = price + dostavka
+                                podzakaz.update(
+                                    [(event.user_id, [tovar, kolvo, fullprice, f'x{koordi[0]}y{koordi[1]}'])])
+                                if not koordi[0] > 30000 and not koordi[1] > 30000 and not koordi[0] < -30000 and not \
+                                        koordi[1] < -30000:
+                                    if kolvo > 0:
+                                        write_msg(event.user_id,
+                                                  f'Стоимость товара в заказе: {price}\nСтоимость доставки: {dostavka}\nИтоговая цена: {fullprice}\n\nОтправте подтверждение оплаты(скрин перевода монет)')
+                                        proverka.append(event.user_id)
+                                        keyboard = VkKeyboard(one_time=True)
+                                        keyboard.add_button('Вернуться в основное меню', color=VkKeyboardColor.POSITIVE)
+                                        write_msg(event.user_id, 'Проверка оплаты...')
+                                    else:
+                                        write_msg(event.user_id, 'Количество товара указано некорректно')
+                                    zakaz.remove(event.user_id)
                                 else:
-                                    write_msg(event.user_id, 'Количество товара указано некорректно')
-                                zakaz.remove(event.user_id)
+                                    zakaz.remove(event.user_id)
+                                    klavamenu()
+                                    write_msg(event.user_id, 'Нет таких кардинат!')
+                                    write_msg(event.user_id, 'Главное меню')
                             else:
                                 zakaz.remove(event.user_id)
                                 klavamenu()
-                                write_msg(event.user_id, 'Нет таких кардинат!')
-                                write_msg(event.user_id, 'Главное меню')
-
+                                write_msg(event.user_id, 'Такого товара нет на складе!')
                         except Exception:
                             zakaz.remove(event.user_id)
                             klavamenu()
