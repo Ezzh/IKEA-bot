@@ -113,6 +113,7 @@ def main():
     admin = []
     podzakaz = {}
     # Основной цикл
+    print('Бот запущен!')
     for event in longpoll.listen():
         # Если пришло новое сообщение
         if event.type == VkEventType.MESSAGE_NEW:
@@ -129,7 +130,7 @@ def main():
                     else:
                         vvod = request.split()
                         try:
-                            if int(vvod[0]) in cur.execute(f"""SELECT id FROM tovari""").fetchall()[0]:
+                            if (int(vvod[0]),) in cur.execute(f"""SELECT id FROM tovari""").fetchall():
                                 tovar = \
                                     cur.execute(f"""SELECT tovar FROM tovari WHERE id = {int(vvod[0])}""").fetchall()[
                                         0][0]
