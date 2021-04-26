@@ -89,7 +89,7 @@ with open('token.txt', 'r') as file:
     token = file.readline()
 vk = vk_api.VkApi(token=token)
 # если есть чат сотрудников, сюда ввести id
-chat_id_sotrudnik = None
+chat_id_sotrudnik = 1
 # создание клавиатуры
 keyboard = VkKeyboard(one_time=True)
 version = 1.3
